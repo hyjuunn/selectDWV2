@@ -200,7 +200,7 @@
         <p>Rules:</p>
         <ul style="text-align: left; display: inline-block;">
             <li>10 Rounds per match.</li>
-            <li>If you hit $0, you lose immediately.</li>
+            <li>If you go below $0.01, you lose immediately.</li>
         </ul>
         <div id="player-inputs">
             <input type="text" class="name-input" placeholder="PLAYER 1">
@@ -226,7 +226,7 @@
         <canvas id="gameCanvas" width="700" height="300"></canvas>
 
         <div id="controls">
-            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10" min="0" step="any">
+            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10" min="0.01" step="0.01">
             <button id="action-btn" onclick="placeBet()">PLACE BET</button>
             <button id="party-btn" onclick="activateParty()">PARTY (-$100)</button>
         </div>
@@ -303,6 +303,11 @@
             startMatch();
         }
 
+        // --- MONEY HELPERS ---
+        function toCents(n) {
+            return Math.round((n + Number.EPSILON) * 100) / 100;
+        }
+
         // --- MATCH LOGIC ---
         function startMatch() {
             roundNum = 1;
@@ -370,7 +375,7 @@
             if (p.money < 100) return; // double check
 
             // Pay for party
-            p.money -= 100;
+            p.money = toCents(p.money - 100);
             updateUI();
             
             // Visuals
@@ -381,15 +386,24 @@
 
             // Apply party effect: either double others or halve others
             const outcomeDouble = Math.random() < 0.5; // 50/50
+            let bankruptOther = null;
             players.forEach((other, i) => {
                 if (i === playerIdx) return; // exclude initiator
                 if (outcomeDouble) {
-                    other.money *= 2;
+                    other.money = toCents(other.money * 2);
                 } else {
-                    other.money = other.money / 2;
+                    const raw = other.money / 2;
+                    if (raw < 0.01 && !bankruptOther) bankruptOther = other;
+                    other.money = toCents(raw);
                 }
             });
             renderScoreboard();
+            if (bankruptOther) {
+                document.getElementById('status-msg').innerText = `${bankruptOther.name} dropped below $0.01!`;
+                document.documentElement.classList.remove('party-active');
+                showFinalResults(bankruptOther, "RAN OUT OF MONEY");
+                return;
+            }
             document.getElementById('status-msg').innerText = outcomeDouble 
                 ? "Party effect: doubled everyone else!"
                 : "Party effect: halved everyone else!";
@@ -400,7 +414,7 @@
                 document.getElementById('status-msg').innerText = "Party over. Back to betting.";
                 
                 // Bankruptcy check (in case they spent their last $100 on a party)
-                if (p.money <= 0) {
+                if (p.money < 0.01) {
                     showFinalResults(p, "SPENT IT ALL ON PARTYING");
                 }
             }, 3000);
@@ -411,8 +425,8 @@
             let betVal = parseFloat(document.getElementById('bet-input').value);
             let p = players[playerIdx];
 
-            if (isNaN(betVal) || betVal <= 0) {
-                alert("Bet must be greater than $0");
+            if (isNaN(betVal) || betVal < 0.01) {
+                alert("Minimum bet is $0.01");
                 return;
             }
             if (betVal > p.money) {
@@ -422,7 +436,7 @@
 
             // Lock in bet
             currentBet = betVal;
-            p.money -= currentBet;
+            p.money = toCents(p.money - currentBet);
             updateUI(); 
 
             // Controls
@@ -511,8 +525,8 @@
             isRunning = false;
             cancelAnimationFrame(animationFrame);
 
-            let profit = currentBet * currentMultiplier;
-            players[playerIdx].money += profit;
+            let profit = toCents(currentBet * currentMultiplier);
+            players[playerIdx].money = toCents(players[playerIdx].money + profit);
             renderScoreboard();
             
             document.getElementById('status-msg').innerText = `WON $${profit.toFixed(2)}!`;
@@ -545,7 +559,7 @@
             document.getElementById('party-btn').disabled = true;
 
             setTimeout(() => {
-                if (players[playerIdx].money <= 0) {
+                if (players[playerIdx].money < 0.01) {
                     showFinalResults(players[playerIdx], "RAN OUT OF MONEY");
                     return; 
                 }
