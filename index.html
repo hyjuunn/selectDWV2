@@ -226,7 +226,7 @@
         <canvas id="gameCanvas" width="700" height="300"></canvas>
 
         <div id="controls">
-            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10" min="0.1" step="0.1">
+            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10" min="0" step="any">
             <button id="action-btn" onclick="placeBet()">PLACE BET</button>
             <button id="party-btn" onclick="activateParty()">PARTY (-$100)</button>
         </div>
@@ -411,8 +411,8 @@
             let betVal = parseFloat(document.getElementById('bet-input').value);
             let p = players[playerIdx];
 
-            if (isNaN(betVal) || betVal < 0.1) {
-                alert("Minimum bet is $0.10");
+            if (isNaN(betVal) || betVal <= 0) {
+                alert("Bet must be greater than $0");
                 return;
             }
             if (betVal > p.money) {
