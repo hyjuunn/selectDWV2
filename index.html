@@ -31,6 +31,33 @@
             z-index: 2;
         }
 
+        /* --- SCOREBOARD --- */
+        #scoreboard {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 240px;
+            border: 2px solid #fff;
+            background: #111;
+            color: #fff;
+            padding: 12px;
+            z-index: 3;
+            text-align: left;
+        }
+        #scoreboard h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+            letter-spacing: 1px;
+        }
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+        }
+        .score-row:last-child { border-bottom: none; }
+        .score-row.active { color: #FFFF00; font-weight: bold; }
+
         /* --- INPUTS & BUTTONS --- */
         input {
             background: #000;
@@ -162,6 +189,12 @@
 </head>
 <body>
 
+    <!-- Left-side Scoreboard -->
+    <div id="scoreboard" class="hidden">
+        <h3>SCOREBOARD</h3>
+        <div id="scoreboard-list"></div>
+    </div>
+
     <div id="setup-screen" class="container">
         <h1>DISHWASHER V2</h1>
         <p>Rules:</p>
@@ -193,7 +226,7 @@
         <canvas id="gameCanvas" width="700" height="300"></canvas>
 
         <div id="controls">
-            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10">
+            <input type="number" id="bet-input" placeholder="BET AMOUNT" value="10" min="0.1" step="0.1">
             <button id="action-btn" onclick="placeBet()">PLACE BET</button>
             <button id="party-btn" onclick="activateParty()">PARTY (-$100)</button>
         </div>
@@ -265,6 +298,7 @@
 
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('scoreboard').classList.remove('hidden');
 
             startMatch();
         }
@@ -308,6 +342,9 @@
             partyBtn.disabled = p.money < 100;
             
             document.getElementById('status-msg').innerText = `${p.name}, place your bet.`;
+
+            // Update scoreboard
+            renderScoreboard();
         }
 
         function resetGraph() {
@@ -342,6 +379,21 @@
             // Play sound effect? (Optional, kept silent for now)
             document.getElementById('status-msg').innerText = "PARTY TIME!!!";
 
+            // Apply party effect: either double others or halve others
+            const outcomeDouble = Math.random() < 0.5; // 50/50
+            players.forEach((other, i) => {
+                if (i === playerIdx) return; // exclude initiator
+                if (outcomeDouble) {
+                    other.money *= 2;
+                } else {
+                    other.money = other.money / 2;
+                }
+            });
+            renderScoreboard();
+            document.getElementById('status-msg').innerText = outcomeDouble 
+                ? "Party effect: doubled everyone else!"
+                : "Party effect: halved everyone else!";
+
             // Remove effect after 3 seconds
             setTimeout(() => {
                 document.documentElement.classList.remove('party-active');
@@ -359,8 +411,8 @@
             let betVal = parseFloat(document.getElementById('bet-input').value);
             let p = players[playerIdx];
 
-            if (isNaN(betVal) || betVal < 1) {
-                alert("Minimum bet is $1");
+            if (isNaN(betVal) || betVal < 0.1) {
+                alert("Minimum bet is $0.10");
                 return;
             }
             if (betVal > p.money) {
@@ -461,6 +513,7 @@
 
             let profit = currentBet * currentMultiplier;
             players[playerIdx].money += profit;
+            renderScoreboard();
             
             document.getElementById('status-msg').innerText = `WON $${profit.toFixed(2)}!`;
             document.getElementById('multiplier-display').style.color = "#0f0"; 
@@ -521,6 +574,8 @@
             safePlayers.push(winner);
             players.shift(); 
 
+            renderScoreboard();
+
             if (players.length === 1) {
                 showFinalResults(players[0], "LAST PLAYER LEFT");
             } else {
@@ -539,6 +594,7 @@
         function showFinalResults(loser, reason) {
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('result-screen').classList.remove('hidden');
+            document.getElementById('scoreboard').classList.add('hidden');
 
             document.getElementById('loser-name').innerText = loser.name;
             document.getElementById('loss-reason').innerText = `(${reason})`;
@@ -554,6 +610,18 @@
             });
 
             document.getElementById('safe-list').innerHTML = safeHTML;
+        }
+
+        // --- SCOREBOARD RENDERING ---
+        function renderScoreboard() {
+            const listEl = document.getElementById('scoreboard-list');
+            if (!listEl) return;
+            let html = "";
+            players.forEach((p, i) => {
+                const active = i === playerIdx ? 'score-row active' : 'score-row';
+                html += `<div class="${active}"><span>${p.name}</span><span>$${p.money.toFixed(2)}</span></div>`;
+            });
+            listEl.innerHTML = html;
         }
 
     </script>
